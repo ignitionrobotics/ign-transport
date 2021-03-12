@@ -30,12 +30,10 @@
   DETAIL_IGN_TRANSPORT_TEST_DIR
 #endif
 
-#ifndef __APPLE__
-  #if __unix__ && __GNUC__ < 8
-    #include <experimental/filesystem>
-  #else
-    #include <filesystem>
-  #endif
+#if __unix__ && __GNUC__ < 8
+  #include <experimental/filesystem>
+#else
+  #include <filesystem>
 #endif
 
 #include <climits>
@@ -94,17 +92,12 @@ namespace testing
   std::string portablePathUnion(const std::string &_str1,
                                 const std::string &_str2)
   {
-#ifdef __APPLE__
-    // Ugly as hell but trying to avoid boost::filesystem
-    return _str1 + "/" + _str2;
-#else
     #if __unix__ && __GNUC__ < 8
       using namespace std::experimental::filesystem;
     #else
       using namespace std::filesystem;
     #endif
     return (path(_str1) / path(_str2)).string();
-#endif
   }
 
 #ifdef _WIN32
