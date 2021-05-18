@@ -1,0 +1,130 @@
+load(
+    "//ign_bazel:build_defs.bzl",
+    "IGNITION_FEATURES",
+    "IGNITION_ROOT",
+    "IGNITION_VISIBILITY",
+    "cmake_configure_file",
+    "generate_yaml",
+    "ign_export_header",
+)
+
+package(
+    default_visibility = IGNITION_VISIBILITY,
+    features = IGNITION_FEATURES,
+)
+
+SCHEMA_INSTALL_PATH = "./ign_transport/log/sql"
+
+PROJECT_NAME = "ignition-transport-log"
+
+PROJECT_MAJOR = 9
+
+PROJECT_MINOR = 0
+
+PROJECT_PATCH = 0
+
+# Generates build_config.hh based on the version numbers in CMake code.
+cmake_configure_file(
+    name = "build_config",
+    src = "src/build_config.hh.in",
+    out = "include/build_config.hh",
+    cmakelists = ["src/CMakeLists.txt"],
+    defines = [
+        "SCHEMA_INSTALL_PATH=%s" % SCHEMA_INSTALL_PATH,
+    ],
+    visibility = ["//visibility:private"],
+)
+
+ign_export_header(
+    name = "include/ignition/transport/log/Export.hh",
+    export_base = "IGNITION_TRANSPORT_LOG",
+    lib_name = "ignition-transport",
+    visibility = ["//visibility:private"],
+)
+
+public_headers_no_gen = [
+    "include/ignition/transport/log/Batch.hh",
+    "include/ignition/transport/log/Descriptor.hh",
+    "include/ignition/transport/log/detail/QueryOptions.hh",
+    "include/ignition/transport/log/Log.hh",
+    "include/ignition/transport/log/Message.hh",
+    "include/ignition/transport/log/MsgIter.hh",
+    "include/ignition/transport/log/Playback.hh",
+    "include/ignition/transport/log/QualifiedTime.hh",
+    "include/ignition/transport/log/QueryOptions.hh",
+    "include/ignition/transport/log/Recorder.hh",
+    "include/ignition/transport/log/SqlStatement.hh",
+    "src/Descriptor.hh",
+]
+
+private_headers = [
+    "src/BatchPrivate.hh",
+    "src/Console.hh",
+    "src/MsgIterPrivate.hh",
+    "src/raii-sqlite3.hh",
+]
+
+sources = glob(["src/*.cc"], exclude=["src/*_TEST.cc"])
+
+test_sources = glob(["src/*_TEST.cc"], exclude=["src/LogCommandAPI_TEST.cc"])
+
+public_headers = public_headers_no_gen + [
+    "include/ignition/transport/log/Export.hh",
+    "include/build_config.hh",
+]
+
+cc_library(
+    name = "ign_transport-log",
+    srcs = sources + private_headers,
+    hdrs = public_headers,
+    includes = ["include"],
+    deps = [
+        IGNITION_ROOT + "ign_transport",
+    ],
+)
+
+cc_binary(
+    name = "libignition-transport-log.so",
+    srcs = ["src/cmd/LogCommandAPI.cc", "src/cmd/LogCommandAPI.hh"],
+    deps = [":ign_transport-log"],
+    linkshared =  True,
+)
+
+[cc_test(
+    name = src.replace("/", "_").replace(".cc", "").replace("src_", ""),
+    srcs = [src],
+    data = [
+        ":sql",
+        ":test/data",
+    ],
+    deps = [
+        ":ign_transport-log",
+        "@gtest",
+        "@gtest//:gtest_main",
+    ],
+) for src in test_sources]
+
+exports_files(["sql"])
+
+cmake_configure_file(
+    name = "log.rb",
+    src = "src/cmd/cmdlog.rb.in",
+    out = "cmdlog.rb",
+    cmakelists = ["src/cmd/CMakeLists.txt"],
+    defines = [
+        "log_library_location=libignition-transport-log.so",
+        "PROJECT_VERSION_FULL=%d.%d.%d" % (PROJECT_MAJOR, PROJECT_MINOR, PROJECT_PATCH),  # noqa
+        "IGN_LIBRARY_NAME=%s" % [PROJECT_NAME],
+    ]
+)
+
+CMDS = "    - log   : Record or playback topics."
+
+generate_yaml(
+    name = "log",
+    commands = CMDS,
+    library_name = PROJECT_NAME,
+    library_version = "%d.%d.%d" % (PROJECT_MAJOR, PROJECT_MINOR, PROJECT_PATCH),
+    ruby_target = "log.rb",
+)
+
