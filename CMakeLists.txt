@@ -77,8 +77,8 @@ else ()
 endif()
 
 #--------------------------------------
-# Find ignition-tools
-ign_find_package(ignition-tools QUIET)
+# Find if ign command is available
+find_program(HAVE_IGN_TOOLS ign)
 
 #============================================================================
 # Configure the build
